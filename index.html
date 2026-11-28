@@ -217,14 +217,37 @@ function renderCards() {
   };
   $("#bok").onclick = () => answer(true);
   $("#bno").onclick = () => answer(false);
-  $("#bsay").onclick = () => {
-    try { const u = new SpeechSynthesisUtterance(`${c.e}. ${c.x}`); u.lang = "en-US"; u.rate = .9; speechSynthesis.cancel(); speechSynthesis.speak(u); }
-    catch (e) { alert("Áudio indisponível neste aparelho."); }
-  };
+  $("#bsay").onclick = () => falar(c);
+}
+// Áudio do cartão: toca o MP3 com a voz da Teacher Ana (gerado pelo bot). Se ainda não existir,
+// usa a voz feminina em inglês do aparelho. Um áudio por vez: o anterior para antes do próximo.
+let tocando = null;
+function vozAparelho(texto) {
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(texto);
+    const vozes = speechSynthesis.getVoices().filter((v) => /^en[-_]US/i.test(v.lang));
+    const fem = /jenny|aria|samantha|zira|female|woman|ava|allison|susan|google us english/i;
+    u.voice = vozes.find((v) => fem.test(v.name)) || vozes[0] || null;
+    u.lang = "en-US"; u.rate = .92;
+    speechSynthesis.speak(u);
+  } catch (e) { alert("Áudio indisponível neste aparelho."); }
+}
+function falar(c) {
+  const texto = `${c.e}. ${c.x || ""}`;
+  if (tocando) { tocando.pause(); tocando = null; }
+  try { speechSynthesis.cancel(); } catch (e) {}
+  if (!c.a) return vozAparelho(texto);
+  const audio = new Audio(c.a);
+  tocando = audio;
+  audio.onerror = () => { if (tocando === audio) { tocando = null; vozAparelho(texto); } };
+  audio.play().catch(() => { if (tocando === audio) { tocando = null; vozAparelho(texto); } });
 }
 function answer(ok) {
   const fc = $("#fc"); haptic(ok ? "medium" : "heavy");
   fc.style.transition = "transform .3s ease"; fc.style.transform = `translateX(${ok ? 500 : -500}px) rotate(${ok ? 25 : -25}deg)`;
+  if (tocando) { tocando.pause(); tocando = null; }
+  try { speechSynthesis.cancel(); } catch (e) {}
   res.push([D.cards[idx].i, ok ? 1 : 0]); idx++;
   updateMainButton();
   setTimeout(renderCards, 260);
